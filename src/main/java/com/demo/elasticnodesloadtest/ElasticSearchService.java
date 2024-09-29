@@ -11,8 +11,10 @@ import org.springframework.data.elasticsearch.core.query.Criteria;
 import org.springframework.data.elasticsearch.core.query.CriteriaQuery;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.IntStream;
 
 @Service
 @RequiredArgsConstructor
@@ -22,12 +24,9 @@ public class ElasticSearchService {
 
     private final ElasticsearchOperations elasticsearchOperations;
 
-
-    // Array of Elasticsearch nodes
     private final String[] nodes = {
-          "hosts write here"
+            "nodes url"
     };
-
 
     public void testNodePerformance() {
         for (String node : nodes) {
@@ -35,11 +34,10 @@ public class ElasticSearchService {
         }
     }
 
-
     private void testNodePerformance(String nodeUrl) {
         int numberOfDocuments = 10; // Number of documents to write/read for load testing
-        long totalWriteTime = 0;
-        long totalReadTime = 0;
+        long totalWriteTime;
+        long totalReadTime;
 
         List<String> documentIds = new ArrayList<>(); // Store document IDs for reading later
 
@@ -49,14 +47,13 @@ public class ElasticSearchService {
     }
 
     private long performWriteOperations(String nodeUrl, int numberOfDocuments, List<String> documentIds) {
-        long totalWriteTime = 0;
+        long[] totalWriteTime = {0}; // Use an array to hold the total write time
 
-        // Perform multiple write operations
-        for (int i = 0; i < numberOfDocuments; i++) {
-            String documentId = String.valueOf(System.currentTimeMillis() + i); // Unique ID to avoid cache hits
+        IntStream.range(0, numberOfDocuments).forEach(i -> {
+            String documentId = String.valueOf(Instant.now().toEpochMilli() + i); // Unique ID to avoid cache hits
             documentIds.add(documentId); // Store the ID for later reading
 
-            DocumentEntity document = new DocumentEntity(documentId, "Test Message " + i, System.currentTimeMillis());
+            DocumentEntity document = new DocumentEntity(documentId, "Test Message " + i, Instant.now().toEpochMilli());
 
             long startTime = System.currentTimeMillis();
 
@@ -65,18 +62,17 @@ public class ElasticSearchService {
             refreshIndex("test_index");  // Force refresh after writing
 
             long writeTime = System.currentTimeMillis() - startTime;
-            totalWriteTime += writeTime;
+            totalWriteTime[0] += writeTime; // Update the total write time
 
             logger.info("Node: {} - Write Response Time for Document ID {}: {} ms", nodeUrl, documentId, writeTime);
-        }
+        });
 
-        return totalWriteTime;
+        return totalWriteTime[0];
     }
 
     private long performReadOperations(String nodeUrl, List<String> documentIds) {
         long totalReadTime = 0;
 
-        // Perform multiple read operations using the stored IDs
         for (String documentId : documentIds) { // Use stored document IDs
 
             long startTime = System.currentTimeMillis();
